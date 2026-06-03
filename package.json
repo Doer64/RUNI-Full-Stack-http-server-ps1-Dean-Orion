@@ -1,0 +1,20 @@
+{
+  "name": "ps1",
+  "version": "1.0.0",
+  "description": "Problem set 1 for Full Stack course in Reichman University",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Doer64/RUNI-Full-Stack-http-server-ps1-Dean-Orion.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Doer64/RUNI-Full-Stack-http-server-ps1-Dean-Orion/issues"
+  },
+  "homepage": "https://github.com/Doer64/RUNI-Full-Stack-http-server-ps1-Dean-Orion#readme"
+}
