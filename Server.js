@@ -1,0 +1,104 @@
+const net = require("net");
+const fs = require("fs");
+const path = require("path");
+
+function parseRequest(rawData) {
+  const text = rawData.toString();
+  request = { str: text };
+  const [headerSection, bodySection] = text.split("\r\n\r\n");
+
+  const [requestLine, ...headerLines] = headerSection.split("\r\n");
+  const [method, fullPath, version] = requestLine.split(" ");
+
+  // Parse headers
+  const headers = {};
+  for (let i = 1; i < headerLines.length; i++) {
+    const colonIndex = headerLines[i].indexOf(":");
+    if (colonIndex > 0) {
+      const key = headerLines[i].slice(0, colonIndex).toLowerCase().trim();
+      const value = headerLines[i].slice(colonIndex + 1).trim();
+      headers[key] = value;
+    }
+  }
+
+  const [realPath, queryString] = fullPath.split("?");
+
+  // Parse URL and query string
+  const query = {};
+  if (queryString) {
+    queryString.split("&").forEach((param) => {
+      const [key, value] = param.split("=");
+      query[decodeURIComponent(key)] = decodeURIComponent(value || "");
+    });
+  }
+
+  request = {
+    str: text,
+    method: method.toUpperCase(),
+    version,
+    path: realPath,
+    query: query,
+    headers: headers,
+    body: bodySection,
+  };
+
+  return request;
+}
+
+// Build HTTP/1.1 response
+function buildResponse(statusCode, statusText, headers, body) {
+  // Getting the character length of the body in order to add later in the header
+  if (body) {
+    headers["Content-Length"] = Buffer.byteLength(body);
+  }
+
+  // The first line of the response
+  let response = `HTTP/1.1 ${statusCode} ${statusText}\r\n`;
+
+  // Adding the headers
+  for (const [key, value] of Object.entries(headers)) {
+    response += `${key}: ${value}\r\n`;
+  }
+
+  // Empty line + body
+  response += "\r\n";
+  if (body) {
+    response += body;
+  }
+
+  return response;
+}
+
+function createRouter() {
+  const router = {
+    ROUTES: [],
+    GET: [],
+    POST: [],
+    PUT: [],
+    DELETE: [],
+  };
+
+  // function to create a new route, takes only the path and has option to add Methods
+  function newRoute(path) {
+    const newRoute = {
+      PATH: path,
+      paramNames: [],
+      paramPath: path.replace(/:([^/]+)/g, (_, paramName) => {
+        paramNames.push(paramName);
+        return `:[${paramNames.length - 1}]`;
+      }),
+      GET: null,
+      POST: null,
+      PUT: null,
+      DELETE: null,
+      // Adding a method with a handler to this route
+      addMethod(method, handler) {
+        this[method] = handler;
+        router[method].push(this);
+        return this;
+      },
+    };
+    router.ROUTES.push(newRoute);
+    return newRoute;
+  }
+}
