@@ -71,7 +71,7 @@ function buildResponse(statusCode, statusText, headers, body) {
 
 function createRouter() {
   const router = {
-    ROUTES: [],
+    ALL: [],
     GET: [],
     POST: [],
     PUT: [],
@@ -79,26 +79,63 @@ function createRouter() {
   };
 
   // function to create a new route, takes only the path and has option to add Methods
-  function newRoute(path) {
+  function CreateRoute(path) {
+    const paramNames = [];
+    const regexPath = path.replace(/:([^/]+)/g, (_, paramName) => {
+      paramNames.push(paramName);
+      return "([^/]+)";
+    });
+
     const newRoute = {
       PATH: path,
-      paramNames: [],
-      paramPath: path.replace(/:([^/]+)/g, (_, paramName) => {
-        paramNames.push(paramName);
-        return `:[${paramNames.length - 1}]`;
-      }),
-      GET: null,
-      POST: null,
-      PUT: null,
-      DELETE: null,
+      paramNames: paramNames,
+      regex: new RegExp(`^${regexPath}$`),
+      _GET: null,
+      _POST: null,
+      _PUT: null,
+      _DELETE: null,
       // Adding a method with a handler to this route
       addMethod(method, handler) {
-        this[method] = handler;
-        router[method].push(this);
+        this["_" + method.toUpperCase()] = handler;
+        router[method.toUpperCase()].push(this);
         return this;
       },
+      get(handler) {
+        return this.addMethod("GET", handler);
+      },
+      post(handler) {
+        return this.addMethod("POST", handler);
+      },
+      put(handler) {
+        return this.addMethod("PUT", handler);
+      },
+      delete(handler) {
+        return this.addMethod("DELETE", handler);
+      },
     };
-    router.ROUTES.push(newRoute);
+    router.ALL.push(newRoute);
     return newRoute;
   }
+
+  // Match a request to a route
+  function match(method, path) {
+    const methodRoutes = router[method.toUpperCase()] || [];
+
+    for (const route of methodRoutes) {
+      const match = path.match(route.regex);
+      if (match) {
+        // Extract params
+        const params = {};
+        route.paramNames.forEach((name, index) => {
+          params[name] = match[index + 1];
+        });
+        return { route: route, method, params };
+      }
+    }
+    return null;
+  }
+
+  router.CreateRoute = CreateRoute;
+  router.match = match;
+  return router;
 }
