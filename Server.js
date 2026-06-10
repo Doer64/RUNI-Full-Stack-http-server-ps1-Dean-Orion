@@ -9,6 +9,7 @@ function createServer() {
   const server = net.createServer((socket) => {
     socket.on("data", async (data) => {
       const req = parseRequest(data);
+      console.log("Request:", req.method, req.path);
 
       // check static first
       if (staticDir && req.method === "GET") {
@@ -313,3 +314,5 @@ function serveStatic(staticDir) {
     get,
   };
 }
+
+module.exports = { createServer };
