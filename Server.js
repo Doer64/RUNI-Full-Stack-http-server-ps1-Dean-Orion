@@ -2,9 +2,60 @@ const net = require("net");
 const fs = require("fs");
 const path = require("path");
 
+function createServer() {
+  const router = createRouter();
+  let staticDir = null; // saved when developer calls app.static()
+
+  const server = net.createServer((socket) => {
+    socket.on("data", async (data) => {
+      const req = parseRequest(data);
+
+      // check static first
+      if (staticDir && req.method === "GET") {
+        const staticHandler = serveStatic(staticDir);
+        const response = await staticHandler.get(req);
+        if (response.statusCode === 200) {
+          socket.end(
+            buildResponse(
+              response.statusCode,
+              response.statusText,
+              response.headers,
+              response.body,
+            ),
+          );
+          return;
+        }
+      }
+
+      // try routes
+      const matched = router.match(req.method, req.path);
+      if (matched) {
+        req.params = matched.params;
+        const handler = matched.route["_" + matched.method.toUpperCase()];
+        let res = createResponse(socket);
+        handler(req, res);
+      } else {
+        socket.end(buildResponse(404, "Not Found", {}, "Not found"));
+      }
+    });
+
+    socket.on("error", (err) => console.error("Socket error:", err.message));
+    socket.on("end", () => console.log("Client disconnected"));
+  });
+
+  return {
+    resource: router.createRoute,
+    static(dir) {
+      staticDir = dir;
+    },
+    listen(port, callback) {
+      server.listen(port, callback);
+    },
+  };
+}
+
 function parseRequest(rawData) {
   const text = rawData.toString();
-  request = { str: text };
   const [headerSection, bodySection] = text.split("\r\n\r\n");
 
   const [requestLine, ...headerLines] = headerSection.split("\r\n");
@@ -32,8 +83,8 @@ function parseRequest(rawData) {
     });
   }
 
-  request = {
-    str: text,
+  const request = {
+    rawString: text,
     method: method.toUpperCase(),
     version,
     path: realPath,
@@ -79,7 +130,7 @@ function createRouter() {
   };
 
   // function to create a new route, takes only the path and has option to add Methods
-  function CreateRoute(path) {
+  function createRoute(path) {
     const paramNames = [];
     const regexPath = path.replace(/:([^/]+)/g, (_, paramName) => {
       paramNames.push(paramName);
@@ -135,9 +186,69 @@ function createRouter() {
     return null;
   }
 
-  router.CreateRoute = CreateRoute;
+  router.createRoute = createRoute;
   router.match = match;
   return router;
+}
+
+function createResponse(socket) {
+  const STATUS_TEXTS = {
+    200: "OK",
+    201: "Created",
+    400: "Bad Request",
+    403: "Forbidden",
+    404: "Not Found",
+    500: "Internal Server Error",
+  };
+
+  const res = {
+    _statusCode: 200,
+    _statusText: "OK",
+    _headers: {},
+    _body: null,
+
+    status(code, text) {
+      this._statusCode = code;
+      this._statusText = text || STATUS_TEXTS[code] || "Unknown";
+      return this;
+    },
+
+    header(key, value) {
+      this._headers[key] = value;
+      return this;
+    },
+
+    body(data) {
+      if (typeof data === "object" && !Buffer.isBuffer(data)) {
+        // JS object is JSON
+        this._body = JSON.stringify(data);
+        this._headers["Content-Type"] = "application/json";
+      } else if (typeof data === "string") {
+        // string is plain text
+        this._body = data;
+        this._headers["Content-Type"] = "text/plain";
+      } else if (Buffer.isBuffer(data)) {
+        // raw buffer is octet-stream
+        this._body = data;
+        this._headers["Content-Type"] =
+          this._headers["Content-Type"] || "application/octet-stream";
+      }
+      return this;
+    },
+
+    send() {
+      socket.end(
+        buildResponse(
+          this._statusCode,
+          this._statusText,
+          this._headers,
+          this._body,
+        ),
+      );
+    },
+  };
+
+  return res;
 }
 
 const MIME_TYPES = {
@@ -188,7 +299,6 @@ function serveStatic(staticDir) {
       response.statusText = "OK";
       response.headers["Content-Type"] = mimeType;
       response.body = await fs.promises.readFile(filePath);
-      response.headers["Content-Length"] = response.body.length;
       return response;
     } catch (err) {
       response.statusCode = 404;
