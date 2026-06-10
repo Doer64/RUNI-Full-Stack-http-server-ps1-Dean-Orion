@@ -139,3 +139,67 @@ function createRouter() {
   router.match = match;
   return router;
 }
+
+const MIME_TYPES = {
+  ".html": "text/html",
+  ".css": "text/css",
+  ".js": "application/javascript",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
+};
+
+function getMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  return MIME_TYPES[ext] || "application/octet-stream";
+}
+
+function serveStatic(staticDir) {
+  async function get(req) {
+    const response = {
+      statusCode: 0,
+      statusText: null,
+      headers: {},
+      body: null,
+    };
+
+    const filePath = path.join(staticDir, req.path);
+    const resolvedPath = path.resolve(filePath);
+    const resolvedDir = path.resolve(staticDir);
+
+    if (!resolvedPath.startsWith(resolvedDir)) {
+      response.statusCode = 403;
+      response.statusText = "Forbidden";
+      response.body = "Access denied";
+      return response;
+    }
+
+    try {
+      const stats = await fs.promises.stat(filePath);
+      if (!stats.isFile()) {
+        response.statusCode = 404;
+        response.statusText = "Not Found";
+        response.body = "File not found";
+        return response;
+      }
+      const mimeType = getMimeType(filePath);
+      response.statusCode = 200;
+      response.statusText = "OK";
+      response.headers["Content-Type"] = mimeType;
+      response.body = await fs.promises.readFile(filePath);
+      response.headers["Content-Length"] = response.body.length;
+      return response;
+    } catch (err) {
+      response.statusCode = 404;
+      response.statusText = "Not Found";
+      response.body = "File not found";
+      return response;
+    }
+  }
+
+  return {
+    dir: staticDir,
+    get,
+  };
+}
