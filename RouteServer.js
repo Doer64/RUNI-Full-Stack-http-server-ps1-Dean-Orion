@@ -31,7 +31,6 @@ app.resource("/answer/:text").post((req, res) => {
   } else {
     res.status(200).body(`Wrong! Try again.`).send();
   }
-  lastAnswer = answer;
 });
 
 app.listen(3000, () => {
