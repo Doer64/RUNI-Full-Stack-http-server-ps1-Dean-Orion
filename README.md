@@ -45,8 +45,8 @@ This makes the flow of a request handler read naturally top to bottom: build up 
 ```
 PS1/
   Server.js         — the framework
-  RouteServer.js    — demo: routing, params, POST requests (trivia game)
-  FileServer.js     — demo: static file serving
+  RouteServer.js    — Example: routing
+  FileServer.js     — Example: static file serving
   public/
     index.html
     secret.html
@@ -133,13 +133,3 @@ app.listen(3000, () => console.log("Running on http://localhost:3000"));
 | `res.header(key, value)` | Add a response header                                          |
 | `res.body(data)`         | Set body — object → JSON, string → plain text, Buffer → binary |
 | `res.send()`             | Send the response                                              |
-
----
-
-## Implementation notes
-
-- HTTP parsed manually from raw TCP bytes via `\r\n` and `\r\n\r\n` splitting
-- Routes stored in per-method arrays, matched at request time using regex built when the route is registered
-- URL params extracted via regex capture groups, attached to `req.params`
-- Static file serving checks for directory traversal attacks using `path.resolve` before reading any file
-- File reads use `fs.promises` with async/await so the server never blocks while waiting for disk
